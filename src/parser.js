@@ -1,117 +1,222 @@
-import fs from 'fs';
-import { EventEmitter } from 'events';
+'use strict';
 
-import Header from './header';
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
 
-export default class Parser extends EventEmitter {
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
 
-    constructor(filename, options) {
-        super();
+var _fs = require('fs');
 
-        this.filename = filename;
-        this.options = options || {};
-        this.encoding = this.options.encoding || 'utf-8';
+var _fs2 = _interopRequireDefault(_fs);
+
+var _events = require('events');
+
+var _header = require('./header');
+
+var _header2 = _interopRequireDefault(_header);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var Parser = function (_EventEmitter) {
+    _inherits(Parser, _EventEmitter);
+
+    function Parser(filename, options) {
+      console.log('##hello ', filename);
+        _classCallCheck(this, Parser);
+
+        var _this = _possibleConstructorReturn(this, (Parser.__proto__ || Object.getPrototypeOf(Parser)).call(this));
+
+        _this.filename = filename;
+        _this.options = options || {};
+        _this.encoding = _this.options.encoding || 'utf-8';
+        return _this;
     }
 
-    parse() {
-        this.emit('start', this);
+    _createClass(Parser, [{
+        key: 'parse',
+        value: function parse() {
+            var _this2 = this;
 
-        this.header = new Header(this.filename, this.encoding);
-        this.header.parse(err => {
+            this.emit('start', this);
 
-            this.emit('header', this.header);
+            this.header = new _header2.default(this.filename, this.encoding);
+            this.header.parse(function (err) {
 
-            let sequenceNumber = 0;
+                _this2.emit('header', _this2.header);
 
-            let loc = this.header.start;
-            let bufLoc = this.header.start;
-            let overflow = null;
-            this.paused = false;
+                var sequenceNumber = 0;
 
-            const stream = fs.createReadStream(this.filename);
+                var loc = _this2.header.start;
+                var bufLoc = _this2.header.start;
+                var overflow = null;
+                _this2.paused = false;
 
-            this.readBuf = () => {
+                var stream = _fs2.default.createReadStream(_this2.filename);
 
-                let buffer;
-                if (this.paused) {
-                    this.emit('paused');
-                    return;
-                }
+                _this2.readBuf = function () {
 
-                while ((buffer = stream.read())) {
-                    if (bufLoc !== this.header.start) { bufLoc = 0; }
-                    if (overflow !== null) { buffer = overflow + buffer; }
-
-                    while ((loc < (this.header.start + (this.header.numberOfRecords * this.header.recordLength))) && ((bufLoc + this.header.recordLength) <= buffer.length)) {
-                        this.emit('record', this.parseRecord(++sequenceNumber, buffer.slice(bufLoc, (bufLoc += this.header.recordLength))));
+                    var buffer = void 0;
+                    if (_this2.paused) {
+                        _this2.emit('paused');
+                        return;
                     }
 
-                    loc += bufLoc;
-                    if (bufLoc < buffer.length) { overflow = buffer.slice(bufLoc, buffer.length); } else { overflow = null; }
+                    while (buffer = stream.read()) {
+                        if (bufLoc !== _this2.header.start) {
+                            bufLoc = 0;
+                        }
+                        if (overflow !== null) {
+                            buffer = overflow + buffer;
+                        }
 
-                    return this;
-                }
+                        while (loc < _this2.header.start + _this2.header.numberOfRecords * _this2.header.recordLength && bufLoc + _this2.header.recordLength <= buffer.length) {
+                            _this2.emit('record', _this2.parseRecord(++sequenceNumber, buffer.slice(bufLoc, bufLoc += _this2.header.recordLength)));
+                        }
+
+                        loc += bufLoc;
+                        if (bufLoc < buffer.length) {
+                            overflow = buffer.slice(bufLoc, buffer.length);
+                        } else {
+                            overflow = null;
+                        }
+
+                        return _this2;
+                    }
+                };
+
+                stream.on('readable', _this2.readBuf);
+                return stream.on('end', function () {
+                    return _this2.emit('end');
+                });
+            });
+
+            return this;
+        }
+    }, {
+        key: 'pause',
+        value: function pause() {
+            return this.paused = true;
+        }
+    }, {
+        key: 'resume',
+        value: function resume() {
+            this.paused = false;
+            this.emit('resuming');
+            return this.readBuf();
+        }
+    }, {
+        key: 'parseRecord',
+        value: function parseRecord(sequenceNumber, buffer) {
+            var _this3 = this;
+
+            var record = {
+                '@sequenceNumber': sequenceNumber,
+                '@deleted': [42, '*'].includes(buffer.slice(0, 1)[0])
             };
 
-            stream.on('readable',this.readBuf);
-            return stream.on('end', () => {
-                return this.emit('end');
-            });
-        });
+            var loc = 1;
+            var _iteratorNormalCompletion = true;
+            var _didIteratorError = false;
+            var _iteratorError = undefined;
 
-        return this;
-    }
+            try {
+                for (var _iterator = Array.from(this.header.fields)[Symbol.iterator](), _step; !(_iteratorNormalCompletion = (_step = _iterator.next()).done); _iteratorNormalCompletion = true) {
+                    var field = _step.value;
+                    // { name: 'SIPTRXNNO',
+                    //    type: 'N',
+                    //    displacement: 1411,
+                    //    length: 16,
+                    //    decimalPlaces: 0 }
+                    // if (field.name=='TRXN_SUFFI' || field.name=='SIPTRXNNO' || field.name=='TER_LOCATI') {
+                    //   console.log('##----ROW----', sequenceNumber, field, _step);
+                    // }
 
-    pause() {
-        return this.paused = true;
-    }
-
-    resume() {
-        this.paused = false;
-        this.emit('resuming');
-        return (this.readBuf)();
-    }
-
-    parseRecord(sequenceNumber, buffer) {
-        const record = {
-            '@sequenceNumber': sequenceNumber,
-            '@deleted': [42,'*'].includes((buffer.slice(0, 1))[0])
-        };
-
-        let loc = 1;
-        for (let field of Array.from(this.header.fields)) {
-            (field => {
-                return record[field.name] = this.parseField(field, buffer.slice(loc, (loc += field.length)));
-            })(field);
-        }
-
-        return record;
-    }
-
-    parseField(field, buffer) {
-        let value = (buffer.toString(this.encoding)).trim();
-
-        if (field.type === 'C') { // Character
-            value = value;
-        } else if (field.type === 'F') { // Floating Point
-            value = (value === +value) && (value === (value | 0)) ? parseInt(value, 10) : parseFloat(value, 10);
-        } else if (field.type == 'L') { // Logical
-            switch (value) {
-                case (['Y', 'y', 'T', 't'].includes(value)):
-                    value = true;
-                    break;
-                case (['N', 'n', 'F', 'f'].includes(value)):
-                    value = false;
-                    break;
-                default:
-                    value = null;
+                    (function (field) {
+                      record[field.name] = _this3.parseField(field, buffer.slice(loc, loc += field.length));
+                      // if (field.name=='TRXN_SUFFI' || field.name=='SIPTRXNNO' || field.name=='TER_LOCATI')
+                      //   console.log('## record-', record, buffer, field.length);
+                      return record[field.name];
+                    })(field);
+                }
+            } catch (err) {
+                _didIteratorError = true;
+                _iteratorError = err;
+            } finally {
+                try {
+                    if (!_iteratorNormalCompletion && _iterator.return) {
+                        _iterator.return();
+                    }
+                } finally {
+                    if (_didIteratorError) {
+                        throw _iteratorError;
+                    }
+                }
             }
-        } else if (field.type === 'M') { // Memo
-            value = value;
-        } else if (field.type === 'N') { // Numeric
-            value = value === +value && value === (value|0) ? parseInt(value) : parseFloat(value, 10);
-        }
 
-        return value;
-    }
-}
+            return record;
+        }
+    }, {
+        key: 'parseField',
+        value: function parseField(field, buffer) {
+            // console.log('buffer:', buffer);
+            var value = buffer.toString(this.encoding).trim();
+            // console.log('## ##', field.name);
+            // if (field.name=='TRXN_SUFFI' || field.name=='SIPTRXNNO' || field.name=='TER_LOCATI') {
+            //   // console.log('1.field- ', field);
+            //   console.log('2.type- ', field.type);
+            //   console.log('3.value- ', value);
+            // }
+
+            if (field.type === 'C') {
+                // Character
+                value = value;
+            } else if (field.type === 'F') {
+                // Floating Point
+                if (value === '' || value === undefined || value === null) { // handle empty values
+                  value = 0;
+                } else {
+                  value = value === +value && value === (value | 0) ? parseInt(value, 10) : parseFloat(value, 10);
+                }
+            } else if (field.type == 'L') {
+                // Logical
+                switch (true) {
+                    case ['Y', 'y', 'T', 't'].includes(value):
+                        value = true;
+                        break;
+                    case ['N', 'n', 'F', 'f'].includes(value):
+                        value = false;
+                        break;
+                    default:
+                        value = null;
+                }
+            } else if (field.type === 'M') {
+                // Memo
+                value = value;
+            } else if (field.type === 'N') {
+                // Numeric
+                if (value === '' || value === undefined || value === null) { // handle empty values
+                  value = 0;
+                } else {
+                  value = value === +value && value === (value | 0) ? parseInt(value) : parseFloat(value, 10);
+                  // value = value;
+                }
+                // if (field.name=='TRXN_SUFFI' || field.name=='SIPTRXNNO' || field.name=='TER_LOCATI') {
+                //   console.log('4.check- ', value === +value && value === (value | 0));
+                //   console.log('5.new- ', value);
+                // }
+            }
+            return value;
+        }
+    }]);
+
+    return Parser;
+}(_events.EventEmitter);
+
+exports.default = Parser;
